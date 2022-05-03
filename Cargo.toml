@@ -1,0 +1,20 @@
+[package]
+name = "happy-tweet"
+version = "0.1.0"
+edition = "2021"
+authors = ["onmax <maximogarciamtnez@gmail.com>"]
+description = "A tool that fetches happy tweets given a search term"
+homepage = "https://github.com/onmax/happy-tweet"
+repository = "https://github.com/onmax/happy-tweet"
+license-file = "LICENSE"
+keywords = ["tweets", "sentimental-analysis", "cli", "good-vibes"]
+categories = ["command-line-utilities"]
+
+
+[dependencies]
+clap = { version = "3.1.12", features = ["derive"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+url = "2.2.2"
