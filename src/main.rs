@@ -1,9 +1,18 @@
+use anyhow::Result;
 use clap::Parser;
 use reqwest::header::AUTHORIZATION;
+use rust_bert::pipelines::sentiment::{
+    Sentiment, SentimentConfig, SentimentModel, SentimentPolarity,
+};
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::fs::File;
-use std::io::prelude::*;
+use std::{
+    env,
+    fs::File,
+    io::prelude::*,
+    sync::mpsc,
+    thread::{self, JoinHandle},
+};
+use tokio::{sync::oneshot, task};
 use url::Url;
 
 static BEARER_ENV_TOKEN_NAME: &str = "HAPPY_TWEET_BEARER_TOKEN";
@@ -19,7 +28,7 @@ struct Arguments {
     /// The term to search for. You can use Twitter's search features like: '@', 'from', 'to', geography locations, etc. More info: https://github.com/onmax/happy-tweet#advance-search-features
     term: String,
     #[clap(short, long, default_value = "/dev/stdout", forbid_empty_values = true, validator = validate_output_path)]
-    /// The output file path. By default it's stdout.
+    /// The output file path. It will be overwritten if it exists. Output will have a JSON format.
     output: std::path::PathBuf,
     #[clap(short, long)]
     /// Bearer token for the twitter api. Read the docs for more info: https://github.com/onmax/happy-tweet#twitter-bearer-token. You can also set an env variable named `HAPPY_TWEET_BEARER_TOKEN`
@@ -37,6 +46,8 @@ struct Tweet {
     text: String,
     url: String,
     user: User,
+    #[serde(skip_serializing)]
+    sentiment: Sentiment,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -82,6 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "https://api.twitter.com/2/tweets/search/recent",
         &[
             ("max_results", "100"),
+            // ("query", format!("{} -filter:replies", args.term).as_str()),
             ("query", &args.term),
             ("tweet.fields", "created_at"),
             ("expansions", "author_id"),
@@ -101,11 +113,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = reqwest::Client::builder().build()?;
     let res = client.get(url).header(AUTHORIZATION, bearer).send().await?;
+    if !res.status().is_success() {
+        Err(String::from(
+            "🙅 No response when requesting tweets. Check your term.",
+        ))?;
+    }
     let data = res.json::<TwitterApiResponse>().await?;
+
+    // TODO remove duplicates
+
+    let tweets_string = data
+        .data
+        .iter()
+        .map(|tweet| tweet.text.to_owned())
+        .collect::<Vec<String>>();
+    let (_handle, classifier) = SentimentClassifier::spawn();
+    let sentiments = classifier.predict(tweets_string).await?;
 
     // convert data to a vector of Tweets
     let mut tweets: Vec<Tweet> = Vec::new();
-    for tweet in data.data {
+    for (tweet, sentiment) in data.data.iter().zip(sentiments) {
         let user = data
             .includes
             .users
@@ -113,15 +140,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .find(|u| u.id == tweet.author_id)
             .unwrap();
         let tweet = Tweet {
-            text: tweet.text,
+            text: tweet.text.clone(),
             url: format!("https://twitter.com/{}/status/{}", user.username, tweet.id),
             user: User {
                 username: user.username.to_string(),
                 profile_image_url: user.profile_image_url.to_string(),
             },
+            sentiment,
         };
         tweets.push(tweet);
     }
+
+    // Filter tweets to only keep the "Positive" ones
+    let tweets = tweets
+        .into_iter()
+        .filter(|tweet| tweet.sentiment.polarity == SentimentPolarity::Positive)
+        .collect::<Vec<Tweet>>();
 
     // write results
     let mut file = File::create(args.output)?;
@@ -152,5 +186,46 @@ fn validate_output_path(output: &str) -> Result<(), String> {
         ))
     } else {
         Ok(())
+    }
+}
+
+/// Message type for internal channel, passing around texts and return value
+/// senders
+type Message = (Vec<String>, oneshot::Sender<Vec<Sentiment>>);
+
+/// Runner for sentiment classification
+#[derive(Debug, Clone)]
+pub struct SentimentClassifier {
+    sender: mpsc::SyncSender<Message>,
+}
+
+impl SentimentClassifier {
+    /// Spawn a classifier on a separate thread and return a classifier instance
+    /// to interact with it
+    pub fn spawn() -> (JoinHandle<Result<()>>, SentimentClassifier) {
+        let (sender, receiver) = mpsc::sync_channel(100);
+        let handle = thread::spawn(move || Self::runner(receiver));
+        (handle, SentimentClassifier { sender })
+    }
+
+    /// The classification runner itself
+    fn runner(receiver: mpsc::Receiver<Message>) -> Result<()> {
+        // Needs to be in sync runtime, async doesn't work
+        let model = SentimentModel::new(SentimentConfig::default())?;
+
+        while let Ok((texts, sender)) = receiver.recv() {
+            let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+            let sentiments = model.predict(texts);
+            sender.send(sentiments).expect("sending results");
+        }
+
+        Ok(())
+    }
+
+    /// Make the runner predict a sample and return the result
+    pub async fn predict(&self, texts: Vec<String>) -> Result<Vec<Sentiment>> {
+        let (sender, receiver) = oneshot::channel();
+        task::block_in_place(|| self.sender.send((texts, sender)))?;
+        Ok(receiver.await?)
     }
 }

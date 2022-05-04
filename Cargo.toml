@@ -18,3 +18,5 @@ tokio = { version = "1", features = ["full"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 url = "2.2.2"
+anyhow = "1.0.56"
+rust-bert = "0.17.0"
