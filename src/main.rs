@@ -162,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json = serde_json::to_string_pretty(&tweets)?;
     file.write_all(json.as_bytes())?;
 
-    println!("\n\n✅  Finish!");
+    println!("\n\n✅  Finish! Retrieved {} tweets.", tweets.len());
 
     Ok(())
 }
