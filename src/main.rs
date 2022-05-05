@@ -43,9 +43,14 @@ struct User {
 
 #[derive(Debug, Serialize)]
 struct Tweet {
-    text: String,
     url: String,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct HappyTweet {
     user: User,
+    tweet: Tweet,
     #[serde(skip_serializing)]
     sentiment: Sentiment,
 }
@@ -131,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sentiments = classifier.predict(tweets_string).await?;
 
     // convert data to a vector of Tweets
-    let mut tweets: Vec<Tweet> = Vec::new();
+    let mut tweets: Vec<HappyTweet> = Vec::new();
     for (tweet, sentiment) in data.data.iter().zip(sentiments) {
         let user = data
             .includes
@@ -139,9 +144,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .find(|u| u.id == tweet.author_id)
             .unwrap();
-        let tweet = Tweet {
-            text: tweet.text.clone(),
-            url: format!("https://twitter.com/{}/status/{}", user.username, tweet.id),
+        let tweet = HappyTweet {
+            tweet: Tweet {
+                content: tweet.text.clone(),
+                url: format!("https://twitter.com/{}/status/{}", user.username, tweet.id),
+            },
             user: User {
                 username: user.username.to_string(),
                 profile_image_url: user.profile_image_url.to_string(),
@@ -155,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tweets = tweets
         .into_iter()
         .filter(|tweet| tweet.sentiment.polarity == SentimentPolarity::Positive)
-        .collect::<Vec<Tweet>>();
+        .collect::<Vec<HappyTweet>>();
 
     // write results
     let mut file = File::create(args.output)?;
