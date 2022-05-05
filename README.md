@@ -16,18 +16,20 @@ The term accepts a string as follows: `happy-tweet eurovision`. You can filter t
 Some examples:
 
 - One hashtag: `happy-tweet "#disney"`
+- Ignore retweet `happy-tweet -is:retweet`
 - Multiple hashtags: `happy-tweet "(#dc OR #marvel)"`
 - Specific language: `happy-tweet "lang:de"`
 - Specific author: `happy-tweet "(from:barackobama)"`
-- Min replies: `happy-tweet "min_replies:30"`
 
 And of course you can combine them:
 
-`happy-tweet "paella lang:es min_replies:2"`
+`happy-tweet "paella lang:es"`
+
+`happy-tweet "(happy OR happiness) lang:en -birthday -is:retweet -is:reply"`
 
 
 
-Read official docs on [Advance Search](https://help.twitter.com/en/using-twitter/twitter-advanced-search).
+Read official docs on [Advance Search](https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query).
 
 ## Twitter Bearer Token
 
