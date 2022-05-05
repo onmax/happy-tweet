@@ -45,6 +45,7 @@ struct User {
 struct Tweet {
     url: String,
     content: String,
+    created_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -148,6 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tweet: Tweet {
                 content: tweet.text.clone(),
                 url: format!("https://twitter.com/{}/status/{}", user.username, tweet.id),
+                created_at: tweet.created_at.clone(),
             },
             user: User {
                 username: user.username.to_string(),
