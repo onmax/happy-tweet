@@ -27,33 +27,41 @@ struct Arguments {
     #[clap(forbid_empty_values = true, validator = validate_term_search)]
     /// The term to search for. You can use Twitter's search features like: '@', 'from', 'to', geography locations, etc. More info: https://github.com/onmax/happy-tweet#advance-search-features
     term: String,
+
     #[clap(short, long, default_value = "/dev/stdout", forbid_empty_values = true, validator = validate_output_path)]
-    /// The output file path. It will be overwritten if it exists. Output will have a JSON format.
+    /// The output file path. It will be append the results if it exists avoiding duplicates. Output will have a JSON format.
     output: std::path::PathBuf,
+
     #[clap(short, long)]
     /// Bearer token for the twitter api. Read the docs for more info: https://github.com/onmax/happy-tweet#twitter-bearer-token. You can also set an env variable named `HAPPY_TWEET_BEARER_TOKEN`
     token: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct User {
     username: String,
     profile_image_url: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Tweet {
     url: String,
     content: String,
     created_at: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct HappyTweet {
     user: User,
     tweet: Tweet,
-    #[serde(skip_serializing)]
-    sentiment: Sentiment,
+    #[serde(skip_serializing, skip_deserializing)]
+    sentiment: Option<Sentiment>,
+}
+
+impl PartialEq for HappyTweet {
+    fn eq(&self, other: &Self) -> bool {
+        self.tweet.url == other.tweet.url
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -155,23 +163,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 username: user.username.to_string(),
                 profile_image_url: user.profile_image_url.to_string(),
             },
-            sentiment,
+            sentiment: Some(sentiment),
         };
         tweets.push(tweet);
     }
 
     // Filter tweets to only keep the "Positive" ones
-    let tweets = tweets
+    let mut tweets = tweets
         .into_iter()
-        .filter(|tweet| tweet.sentiment.polarity == SentimentPolarity::Positive)
+        .filter(|tweet| {
+            if let Some(sentiment) = &tweet.sentiment {
+                sentiment.polarity == SentimentPolarity::Positive
+            } else {
+                false
+            }
+        })
         .collect::<Vec<HappyTweet>>();
 
+    // check if files exists and appends to the array tweets
+    let output_path = args.output.as_path();
+    if output_path.exists() {
+        let mut file = File::open(output_path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        let existing_tweets: Vec<HappyTweet> = serde_json::from_str(&contents)?;
+        for existing_tweet in existing_tweets {
+            if !tweets.contains(&existing_tweet) {
+                tweets.push(existing_tweet);
+            }
+        }
+    }
+
     // write results
-    let mut file = File::create(args.output)?;
+    let mut file = File::create(output_path)?;
     let json = serde_json::to_string_pretty(&tweets)?;
     file.write_all(json.as_bytes())?;
 
-    println!("\n\n✅  Finish! Retrieved {} tweets.", tweets.len());
+    println!(
+        "\n\n✅  Finish! Retrieved {} tweets. Check {}",
+        tweets.len(),
+        output_path.display()
+    );
 
     Ok(())
 }
