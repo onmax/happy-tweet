@@ -103,11 +103,11 @@ struct TwitterApiResponse {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Arguments::parse();
+    println!("Starting...");
     let url = Url::parse_with_params(
         "https://api.twitter.com/2/tweets/search/recent",
         &[
             ("max_results", "100"),
-            // ("query", format!("{} -filter:replies", args.term).as_str()),
             ("query", &args.term),
             ("tweet.fields", "created_at"),
             ("expansions", "author_id"),
