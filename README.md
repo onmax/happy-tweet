@@ -6,8 +6,23 @@ A tool that fetches happy tweets given a search term
 
 ## Installation
 
-TODO
+**Remember that you will need a [Twitter Bearer Token](#twitter-bearer-token)**
 
+### Cargo run
+
+`cargo run -- "#banana" -o output.json -t YOUR_TOKEN_HERE`
+
+_`#banana` is the search term, replace it with your search_
+
+### Dockerfile
+
+Modify the Dockerfile a replace:
+
+- [Twitter Bearer Token](#twitter-bearer-token)
+- Your search term
+
+`make build #you are suppose to run only once`
+`make run`
 
 ## Advance Search Features
 
@@ -25,18 +40,14 @@ And of course you can combine them:
 
 `happy-tweet "paella lang:es"`
 
-`happy-tweet "(happy OR happiness) lang:en -birthday -is:retweet -is:reply"`
-
-
+`happy-tweet "(happy OR happiness) lang:en -birthday -is:retweet"`
 
 Read official docs on [Advance Search](https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query).
 
 ## Twitter Bearer Token
 
-TODO
+[How to generate a Bearer Token](https://developer.twitter.com/en/docs/authentication/oauth-2-0/bearer-tokens#:~:text=Login%20to%20your%20Twitter%20account,Bearer%20Token%20on%20this%20page.)
 
 ## Output
 
 You can select the output file path using the flag `-o` or `--output`. It will overwrite if it exists. The output has a JSON format. By default it will write the output in `/dev/stdout`.
-
-
