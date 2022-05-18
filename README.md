@@ -52,4 +52,4 @@ Read official docs on [Advance Search](https://developer.twitter.com/en/docs/twi
 
 ## Output
 
-You can select the output file path using the flag `-o` or `--output`. It will overwrite if it exists. The output has a JSON format. By default it will write the output in `/dev/stdout`.
+You can select the output file path using the flag `-o` or `--output`. It will append the new results to the existing file, otherwise it will create the file. The output has a JSON format. By default it will write the output in `/dev/stdout`.
