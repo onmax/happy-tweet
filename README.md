@@ -16,13 +16,15 @@ _`#banana` is the search term, replace it with your search_
 
 ### Dockerfile
 
-Modify the Dockerfile a replace:
+Modify the Dockerfile and replace:
 
 - [Twitter Bearer Token](#twitter-bearer-token)
 - Your search term
 
-`make build #you are suppose to run only once`
-`make run`
+```bash
+make build #you are suppose to run only once
+make run
+```
 
 ## Advance Search Features
 
